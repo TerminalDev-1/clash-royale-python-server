@@ -2,18 +2,39 @@
 import argparse
 import asyncio
 import hashlib
+import json
 import logging
 import secrets
 import struct
+import time
 from pathlib import Path
 from nacl.public import PrivateKey, PublicKey, Box
 from nacl.exceptions import CryptoError
 from nacl.secret import SecretBox
-from home import login_ok, own_home
+from home import login_ok, own_home, chest_reward
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 PRIVATE_KEY = PrivateKey((Path(__file__).resolve().parent.parent / 'build/server-private.key').read_bytes())
 PUBLIC_KEY = bytes(PRIVATE_KEY.public_key)
+STATE_PATH = Path(__file__).resolve().parent.parent / 'build' / 'player.json'
+
+def load_state():
+    if STATE_PATH.exists():
+        return json.loads(STATE_PATH.read_text(encoding='utf8'))
+    return {'gold': 1000, 'gems': 100, 'card_count': 0, 'next_chest': 0}
+
+def collect_free_chest(state, now):
+    if state['next_chest'] > now:
+        return False
+    state['gold'] += 50
+    state['gems'] += 2
+    state['card_count'] += 3
+    state['next_chest'] = now + 4 * 60 * 60
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temporary = STATE_PATH.with_suffix('.tmp')
+    temporary.write_text(json.dumps(state), encoding='utf8')
+    temporary.replace(STATE_PATH)
+    return True
 
 def frame(mid, payload, version=0):
     return mid.to_bytes(2, 'big') + len(payload).to_bytes(3, 'big') + version.to_bytes(2, 'big') + payload
@@ -96,7 +117,7 @@ async def handle(reader, writer):
                 encrypted = box.encrypt(rnonce + session_key + login_ok('local-private-server'), nonce).ciphertext
                 writer.write(frame(20104, encrypted, 1))
                 outgoing_nonce = (int.from_bytes(rnonce, 'little') + 2).to_bytes(24, 'little')
-                writer.write(frame(24101, SecretBox(session_key).encrypt(own_home(), outgoing_nonce).ciphertext))
+                writer.write(frame(24101, SecretBox(session_key).encrypt(own_home(load_state()), outgoing_nonce).ciphertext))
                 session = {'box': SecretBox(session_key), 'incoming': int.from_bytes(snonce, 'little'), 'outgoing': int.from_bytes(outgoing_nonce, 'little')}
                 await writer.drain()
                 logging.info('Sent LoginOk 20104 and experimental OwnHomeData 24101')
@@ -106,9 +127,31 @@ async def handle(reader, writer):
                 session['incoming'] += 2
                 decoded = session['box'].decrypt(payload, session['incoming'].to_bytes(24, 'little'))
                 logging.info('Decrypted message %d, application length %d', mid, len(decoded))
+                response_id, response = None, None
                 if mid in (10108, 14405):
                     response_id = 20108 if mid == 10108 else 24411
                     response = b'' if mid == 10108 else b'\x00'
+                elif mid == 14102:
+                    command = Reader(decoded)
+                    tick, checksum, count = command.vint(), command.vint(), command.vint()
+                    if not 0 <= count <= 128:
+                        raise ValueError('Invalid command count')
+                    for _ in range(count):
+                        kind = command.vint()
+                        command_tick, command_unknown = command.vint(), command.vint()
+                        logging.info('Client command %d at tick %d', kind, command_tick)
+                        if kind == 509:
+                            state = load_state()
+                            if collect_free_chest(state, int(time.time())):
+                                response_id, response = 24111, chest_reward()
+                            else:
+                                logging.info('Free chest is on cooldown')
+                        elif kind == 526:
+                            command.vint(); command.vint()
+                        else:
+                            logging.info('Unsupported command %d', kind)
+                            break
+                if response_id is not None:
                     session['outgoing'] += 2
                     encrypted = session['box'].encrypt(response, session['outgoing'].to_bytes(24, 'little')).ciphertext
                     writer.write(frame(response_id, encrypted))

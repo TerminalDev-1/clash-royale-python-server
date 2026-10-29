@@ -40,22 +40,32 @@ def login_ok(token):
     for s in ('G:1', '', 'GB', '', '', '', ''): w.s(s)
     return bytes(w.data)
 
-def own_home():
+def chest_reward():
+    w = Writer()
+    w.v(210, 1); w.b(0)  # server command, format version, non-draft
+    w.v(1)  # one card stack
+    w.v(1, 0, 0, 3, 0, 0, 0)  # three copies of card 1
+    w.v(0, 50, 2, 1, 2, 2, -1, -1, 0, 0)
+    return bytes(w.data)
+
+def own_home(state=None):
+    state = state or {'gold': 1000, 'gems': 100, 'card_count': 0, 'next_chest': 0}
     w = Writer(); now = int(time.time())
-    w.long(1); w.v(0, 0, 0, 0, 1500268361); w.b(0)
+    available = state['next_chest'] <= now
+    w.long(1); w.v(0, 0 if available else 1, 0, 0, 1500268361); w.b(0)
     w.v(5)
     for _ in range(5):
         w.v(8)
         for i in range(8): w.v(26000000+i)
     w.b(255)
-    for i in range(8): w.v(i+1, 0, 0, 0, 0, 0, 0)
+    for i in range(8): w.v(i+1, 0, 0, state['card_count'] if i == 0 else 0, 0, 0, 0)
     w.v(0, 0)
     w.v(0, 0, -1, 33, now, 1, 0)
     w.v(1, 1109); w.s('2v2 Button'); w.v(8, now, 1609462800, now, 0, 0, 0, 0, 0, 0, 0, 0)
     w.s('2v2 Button'); w.s('{"HideTimer":false,"HidePopupTimer":false}"')
     w.v(0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 1109, 2, 2)
     w.s('{"ID":"CARD_RELEASE","Params":{}})'); w.v(4); w.s('{"ID":"CLAN_CHEST","Params":{}}')
-    w.v(4, 0, 0, 0, 0, 0, 0, 0); w.b(0)
+    w.v(4, 0, max(0, state['next_chest'] - now)*20, 0, 0, 0, 0, 0); w.b(0)
     w.v(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1714640, 1726960, now, 0, 0, 0, -1, 3)
     w.v(*([0]*7), 2, 1)
     w.v(54, 0) # arena data
@@ -66,7 +76,7 @@ def own_home():
     # LogicClientAvatar
     w.v(0,1,0,1,0,1); w.s('Player'); w.b(1)
     w.v(2,0,0,0,100,0,0,0,0,0,100,100,50,1,0,0,8,10)
-    w.v(5,0,0, 5,1,1000, 5,3,2, 5,4,0, 5,5,1000, 5,13,0, 5,14,0, 5,16,51, 5,28,0, 5,29,72000006)
+    w.v(5,0,0, 5,1,state['gold'], 5,3,2, 5,4,0, 5,5,state['gold'], 5,13,0, 5,14,0, 5,16,51, 5,28,0, 5,29,72000006)
     w.v(0,0,0,6, 5,6,30, 5,7,0, 5,8,8, 5,1,26000048, 5,11,32, 5,27,1)
-    w.v(0,0,0,100,100,0,1,0,7, 0,0,0,0,0,0,7, 0,0,0,0,0,0,now,0,0)
+    w.v(0,0,0,state['gems'],state['gems'],0,1,0,7, 0,0,0,0,0,0,7, 0,0,0,0,0,0,now,0,0)
     return bytes(w.data)

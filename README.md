@@ -2,7 +2,7 @@
 
 Early development experiment targeting the Clash Royale 1.9.2 Android client. The Python server handles the encrypted handshake, sends a prototype login and home-state packet, and responds to keepalives and avatar-stream requests. A test client has reached the home screen over a LAN.
 
-**Current limitations:** Home and account data are fixed prototype values. Battles, progression, persistent accounts, chests, and most requests are not implemented. The first APK release is configured for the author's LAN address and server key; it is a development snapshot, not a plug-and-play client for other servers.
+**Current limitations:** This is a single-player prototype. Free chests give fixed rewards and have a four-hour cooldown; their rewards and cooldown persist locally. Battles, multiple accounts, most progression, and most requests are not implemented. The example APK release contains a placeholder address and must be rebuilt for your server.
 
 ## Setup
 
