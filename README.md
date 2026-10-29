@@ -1,5 +1,7 @@
 # Clash Royale Python private server
 
+> **Maintenance status: unmaintained.** This repository remains available as an early-development snapshot. Development has moved on to Open Mini, an open-source private-server project targeting the final release of Clash Mini. No ongoing maintenance is planned here.
+
 Early development experiment targeting the Clash Royale 1.9.2 Android client. The Python server handles the encrypted handshake, sends a prototype login and home-state packet, and responds to keepalives and avatar-stream requests. A test client has reached the home screen over a LAN.
 
 **Current limitations:** This is a single-player prototype. Free chests give fixed rewards and have a four-hour cooldown; their rewards and cooldown persist locally. The Battle button starts an experimental trainer match simulated by the client, not an authoritative server simulation. Match results and progression are not persisted; multiplayer, multiple accounts, and most requests are not implemented. The example APK release contains a placeholder address and must be rebuilt for your server.
