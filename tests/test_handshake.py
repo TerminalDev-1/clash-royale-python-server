@@ -43,6 +43,23 @@ class HandshakeTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(mid, 24101)
             next_nonce = (int.from_bytes(rnonce, 'little') + 2).to_bytes(24, 'little')
             self.assertGreater(len(SecretBox(key).decrypt(response, next_nonce)), 300)
+            # Battle button sends one matchmaking command; the server responds with NPC state.
+            from home import Writer
+            commands = Writer()
+            commands.v(0, 0, 1, 525, 0, 0, 0, 0)
+            commands.b(0)
+            client_nonce = (int.from_bytes(snonce, 'little') + 2).to_bytes(24, 'little')
+            writer.write(server.frame(14102, SecretBox(key).encrypt(bytes(commands.data), client_nonce).ciphertext))
+            await writer.drain()
+            mid, response = await receive()
+            self.assertEqual(mid, 21903)
+            battle_nonce = (int.from_bytes(rnonce, 'little') + 4).to_bytes(24, 'little')
+            self.assertGreater(len(SecretBox(key).decrypt(response, battle_nonce)), 300)
+            client_nonce = (int.from_bytes(snonce, 'little') + 4).to_bytes(24, 'little')
+            writer.write(server.frame(14101, SecretBox(key).encrypt(b'', client_nonce).ciphertext))
+            await writer.drain()
+            mid, response = await receive()
+            self.assertEqual(mid, 24101)
         finally:
             writer.close()
             await writer.wait_closed()

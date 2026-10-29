@@ -12,6 +12,7 @@ from nacl.public import PrivateKey, PublicKey, Box
 from nacl.exceptions import CryptoError
 from nacl.secret import SecretBox
 from home import login_ok, own_home, chest_reward
+from npc_battle import npc_sector_state
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 PRIVATE_KEY = PrivateKey((Path(__file__).resolve().parent.parent / 'build/server-private.key').read_bytes())
@@ -148,9 +149,16 @@ async def handle(reader, writer):
                                 logging.info('Free chest is on cooldown')
                         elif kind == 526:
                             command.vint(); command.vint()
+                        elif kind == 525:
+                            command.vint(); command.vint(); command.take(1)
+                            response_id, response = 21903, npc_sector_state()
                         else:
                             logging.info('Unsupported command %d', kind)
                             break
+                elif mid == 14104:
+                    response_id, response = 21903, npc_sector_state()
+                elif mid == 14101:
+                    response_id, response = 24101, own_home(load_state())
                 if response_id is not None:
                     session['outgoing'] += 2
                     encrypted = session['box'].encrypt(response, session['outgoing'].to_bytes(24, 'little')).ciphertext
